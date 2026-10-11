@@ -1,0 +1,7 @@
+services:
+  checkers:
+    build: .
+    image: russian-checkers
+    ports:
+      - "${PORT:-3000}:3000"
+    restart: unless-stopped

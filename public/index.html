@@ -1,0 +1,582 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Russian Checkers</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='16' r='14' fill='%23c0392b'/><circle cx='16' cy='16' r='8' fill='none' stroke='%23fff' stroke-opacity='.6' stroke-width='2'/></svg>">
+<style>
+:root {
+  --bg: #f4f1ec; --panel: #ffffff; --text: #1f2430; --muted: #6b7280; --line: #e3ded5;
+  --accent: #2f6fed; --accent-text: #fff; --danger: #d64545; --ok: #2e9e5b;
+  --sq-light: #f0d9b5; --sq-dark: #a97a50; --board-edge: #5b3f26;
+  --piece-w: #fbfaf7; --piece-w-edge: #cfc8bb; --piece-b: #2b2b30; --piece-b-edge: #0e0e10;
+  --hl: #2e9e5b; --sel: #2f6fed; --last: rgba(255, 214, 10, .42);
+  --shadow: 0 6px 24px rgba(30, 25, 15, .12);
+}
+:root[data-theme="dark"] {
+  --bg: #14161b; --panel: #1d2027; --text: #e8eaf0; --muted: #9aa1b0; --line: #2d313b;
+  --accent: #6c97ff; --accent-text: #0b1020; --danger: #ff6b6b; --ok: #4cc47f;
+  --sq-light: #c9b08a; --sq-dark: #6b4b33; --board-edge: #2a1c10;
+  --piece-w: #f1eee8; --piece-w-edge: #a49d90; --piece-b: #25262c; --piece-b-edge: #050507;
+  --hl: #4cc47f; --sel: #6c97ff; --last: rgba(255, 214, 10, .30);
+  --shadow: 0 6px 24px rgba(0, 0, 0, .45);
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body {
+  background: var(--bg); color: var(--text);
+  font: 15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  -webkit-tap-highlight-color: transparent;
+}
+button, input { font: inherit; color: inherit; }
+button {
+  border: 1px solid var(--line); background: var(--panel); border-radius: 10px;
+  padding: 8px 14px; cursor: pointer; transition: transform .05s, background .15s;
+}
+button:hover { background: color-mix(in srgb, var(--panel) 88%, var(--text)); }
+button:active { transform: translateY(1px); }
+button.primary { background: var(--accent); color: var(--accent-text); border-color: transparent; font-weight: 600; }
+button.primary:hover { filter: brightness(1.08); background: var(--accent); }
+button.danger { color: var(--danger); }
+button:disabled { opacity: .5; cursor: default; }
+input[type=text] {
+  width: 100%; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line);
+  background: var(--bg); outline: none;
+}
+input[type=text]:focus { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 25%, transparent); }
+
+header {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 10px 16px; border-bottom: 1px solid var(--line); background: var(--panel);
+}
+.brand { display: flex; align-items: center; gap: 10px; font-weight: 700; letter-spacing: .2px; }
+.brand i { width: 22px; height: 22px; border-radius: 50%; background: var(--piece-b); box-shadow: inset 0 0 0 4px var(--piece-b), inset 0 0 0 6px var(--piece-w); }
+.icon-btn { width: 38px; height: 38px; padding: 0; display: grid; place-items: center; font-size: 18px; }
+
+.card {
+  background: var(--panel); border: 1px solid var(--line); border-radius: 16px; box-shadow: var(--shadow); padding: 22px;
+}
+.center { min-height: calc(100% - 59px); display: grid; place-items: center; padding: 20px 16px; }
+.center .card { width: min(440px, 100%); }
+h1 { font-size: 24px; margin: 0 0 4px; }
+h2 { font-size: 15px; margin: 0 0 8px; }
+.muted { color: var(--muted); }
+.field { margin: 14px 0; }
+.field label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 6px; }
+.seg { display: flex; gap: 6px; }
+.seg button { flex: 1; }
+.seg button:disabled { opacity: .45; }
+.check { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+.check input { width: 18px; height: 18px; }
+.seg button.on { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); font-weight: 600; }
+
+/* game layout */
+#game { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 20px; max-width: 1080px; margin: 0 auto; padding: 16px; align-items: start; }
+.stage { display: flex; flex-direction: column; gap: 10px; min-width: 0; align-items: center; }
+.boardwrap { position: relative; width: min(100%, calc(100vh - 230px), 680px); min-width: 260px; }
+.pbar {
+  width: min(100%, calc(100vh - 230px), 680px); min-width: 260px;
+  display: flex; align-items: center; gap: 10px; padding: 4px 4px;
+}
+.pbar .dot { width: 18px; height: 18px; border-radius: 50%; flex: none; border: 2px solid var(--piece-w-edge); }
+.pbar .dot.w { background: var(--piece-w); }
+.pbar .dot.b { background: var(--piece-b); border-color: var(--piece-b-edge); }
+.pbar .nm { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pbar .tag { font-size: 12px; padding: 1px 8px; border-radius: 99px; background: var(--line); color: var(--muted); }
+.pbar .tag.turn { background: var(--ok); color: #fff; }
+.pbar .tag.off { background: var(--danger); color: #fff; }
+.pbar .cnt { margin-left: auto; color: var(--muted); font-size: 13px; white-space: nowrap; }
+
+.board {
+  position: relative; width: 100%; aspect-ratio: 1; display: grid; grid-template: repeat(8, 1fr) / repeat(8, 1fr);
+  border: 6px solid var(--board-edge); border-radius: 8px; box-shadow: var(--shadow); overflow: hidden; touch-action: manipulation; user-select: none;
+}
+.sq { position: relative; display: grid; place-items: center; }
+.sq.light { background: var(--sq-light); }
+.sq.dark { background: var(--sq-dark); }
+.sq .coord { position: absolute; font-size: clamp(8px, 1.6vw, 11px); font-weight: 600; opacity: .65; pointer-events: none; }
+.sq .coord.f { right: 3px; bottom: 1px; }
+.sq .coord.r { left: 3px; top: 1px; }
+.sq.light .coord { color: var(--sq-dark); } .sq.dark .coord { color: var(--sq-light); }
+.sq.last::before { content: ""; position: absolute; inset: 0; background: var(--last); }
+.sq.dest { cursor: pointer; }
+.sq.dest::after {
+  content: ""; position: absolute; width: 28%; height: 28%; border-radius: 50%;
+  background: var(--hl); opacity: .85; box-shadow: 0 0 0 4px color-mix(in srgb, var(--hl) 30%, transparent);
+}
+.sq.dest.cap::after { width: 36%; height: 36%; animation: pulse 1.2s ease-in-out infinite; }
+.sq.path::before { content: ""; position: absolute; inset: 0; background: color-mix(in srgb, var(--sel) 38%, transparent); }
+
+.piece { position: relative; width: 78%; height: 78%; border-radius: 50%; z-index: 1; transition: transform .12s, opacity .2s; }
+.piece.w { background: var(--piece-w); border: 3px solid var(--piece-w-edge); }
+.piece.b { background: var(--piece-b); border: 3px solid var(--piece-b-edge); }
+.piece.king::before {
+  content: "♛"; position: absolute; inset: 0; display: grid; place-items: center; z-index: 2;
+  font-size: clamp(14px, 4.4vw, 34px); line-height: 1; color: #d8a31a; 
+}
+.piece.mine.movable { cursor: pointer; }
+.piece.must { animation: ring 1.1s ease-in-out infinite; }
+.piece.sel { transform: scale(1.08); box-shadow: 0 0 0 4px var(--sel); }
+.piece.ghost { opacity: .28; }
+@keyframes ring {
+  0%, 100% { box-shadow: 0 0 0 3px var(--hl); }
+  50% { box-shadow: 0 0 0 7px color-mix(in srgb, var(--hl) 35%, transparent); }
+}
+@keyframes pulse { 50% { transform: scale(1.25); } }
+
+.cursor {
+  position: absolute; left: 0; top: 0; z-index: 20; pointer-events: none; transition: transform 70ms linear, opacity .15s; will-change: transform;
+}
+.cursor svg { display: block; filter: drop-shadow(0 1px 2px rgba(0,0,0,.4)); }
+.cursor span {
+  position: absolute; left: 14px; top: 16px; white-space: nowrap; font-size: 12px; font-weight: 600; color: #fff;
+  padding: 2px 8px; border-radius: 99px; background: #e0589b;
+}
+
+.banner {
+  min-height: 38px; width: min(100%, calc(100vh - 230px), 680px); min-width: 260px;
+  display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 12px;
+  background: var(--panel); border: 1px solid var(--line); font-weight: 500;
+}
+.banner.must { border-color: var(--hl); background: color-mix(in srgb, var(--hl) 14%, var(--panel)); }
+.banner.over { border-color: var(--accent); }
+
+.side { display: flex; flex-direction: column; gap: 14px; }
+.side .card { padding: 16px; }
+.invite { display: flex; gap: 8px; }
+.invite input { flex: 1; min-width: 0; font-size: 13px; }
+.row { display: flex; gap: 8px; flex-wrap: wrap; }
+.list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.list li { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.moves { max-height: 240px; overflow: auto; display: grid; grid-template-columns: 28px 1fr 1fr; gap: 2px 8px; font-variant-numeric: tabular-nums; font-size: 13px; }
+.moves .n { color: var(--muted); }
+.moves .cap { color: var(--danger); }
+.offer { border-color: var(--accent); }
+.names { font-size: 13px; }
+
+.modal { position: fixed; inset: 0; background: rgba(0,0,0,.45); display: grid; place-items: center; padding: 16px; z-index: 50; }
+.hidden { display: none !important; }
+
+@media (max-width: 820px) {
+  #game { grid-template-columns: 1fr; padding: 10px; gap: 14px; }
+  .boardwrap, .pbar, .banner { width: min(100%, 680px); }
+  .moves { max-height: 140px; }
+}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand"><i></i><span>Russian Checkers</span></div>
+  <button class="icon-btn" id="themeBtn" title="Toggle light / dark" aria-label="Toggle theme">◐</button>
+</header>
+<main id="app"></main>
+
+<script src="/rules.js"></script>
+<script>
+(() => {
+  const $ = (s, el = document) => el.querySelector(s);
+  const h = (html) => { const t = document.createElement('template'); t.innerHTML = html.trim(); return t.content.firstChild; };
+  const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const store = {
+    get(k) { try { return localStorage.getItem(k); } catch { return null; } },
+    set(k, v) { try { localStorage.setItem(k, v); } catch {} },
+  };
+
+  // ---- theme ----
+  const root = document.documentElement;
+  function applyTheme(t) { root.dataset.theme = t; store.set('theme', t); }
+  applyTheme(store.get('theme') || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'));
+  $('#themeBtn').onclick = () => applyTheme(root.dataset.theme === 'dark' ? 'light' : 'dark');
+
+  // ---- identity ----
+  let clientId = store.get('clientId');
+  if (!clientId) {
+    clientId = (crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2) + Date.now().toString(36));
+    store.set('clientId', clientId);
+  }
+
+  const app = $('#app');
+  const roomMatch = location.pathname.match(/^\/g\/([\w-]+)$/);
+  if (roomMatch) enterRoom(roomMatch[1]); else showHome();
+
+  function askName(title, sub, cta, cb, extra = '') {
+    const el = h(`<div class="center"><form class="card">
+      <h1>${esc(title)}</h1><div class="muted">${esc(sub)}</div>
+      <div class="field"><label for="nm">Your name</label>
+        <input type="text" id="nm" maxlength="20" autocomplete="nickname" required value="${esc(store.get('name') || '')}" placeholder="e.g. Alex"></div>
+      ${extra}
+      <button class="primary" style="width:100%">${esc(cta)}</button></form></div>`);
+    app.replaceChildren(el);
+    const input = $('#nm', el);
+    input.focus(); input.select();
+    $('form', el).onsubmit = (e) => {
+      e.preventDefault();
+      const name = input.value.trim().slice(0, 20);
+      if (!name) return input.focus();
+      store.set('name', name);
+      cb(name, el);
+    };
+  }
+
+  // ---- home: create a game ----
+  function showHome() {
+    let color = 'random', mirror = true, hostBottom = true;
+    askName('New game', 'Create a game, then send the invite link to a friend.', 'Create game', async (name, el) => {
+      const btn = $('button.primary', el); btn.disabled = true;
+      try {
+        const r = await fetch('/api/create', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ clientId, color, mirror, hostBottom }) });
+        if (!r.ok) throw new Error('server replied ' + r.status + ' ' + (await r.text()).slice(0, 100));
+        const { room } = await r.json();
+        try { sessionStorage.setItem('created', room); } catch {}
+        location.href = '/g/' + room;
+      } catch (err) { btn.disabled = false; alert('Could not create the game: ' + err.message); }
+    }, `<div class="field"><label>Play as</label><div class="seg" id="seg">
+        <button type="button" data-c="w">White</button><button type="button" data-c="random" class="on">Random</button><button type="button" data-c="b">Black</button></div></div>
+      <div class="field"><label class="check"><input type="checkbox" id="mirror" checked> Flip the board for the opponent</label>
+        <div class="muted" style="font-size:13px;margin:2px 0 0 26px">On: each player sees their own pieces at the bottom.</div></div>
+      <div class="field"><label>Shared board: your side is at the</label><div class="seg" id="seg2">
+        <button type="button" data-b="1" class="on" disabled>Bottom</button><button type="button" data-b="0" disabled>Top</button></div></div>`);
+    $('#mirror').onchange = (e) => {
+      mirror = e.target.checked;
+      for (const x of $('#seg2').children) x.disabled = mirror;
+    };
+    $('#seg2').onclick = (e) => {
+      const b = e.target.closest('button'); if (!b || b.disabled) return;
+      hostBottom = b.dataset.b === '1';
+      for (const x of $('#seg2').children) x.classList.toggle('on', x === b);
+    };
+    $('#seg').onclick = (e) => {
+      const b = e.target.closest('button'); if (!b) return;
+      color = b.dataset.c;
+      for (const x of $('#seg').children) x.classList.toggle('on', x === b);
+    };
+  }
+
+  // ---- game ----
+  function enterRoom(roomId) {
+    let created = null;
+    try { created = sessionStorage.getItem('created'); } catch {}
+    // the creator already gave a name on the home screen
+    if (created === roomId && store.get('name')) return startGame(roomId, store.get('name'));
+    askName('Join game', 'Enter a name so the other players know who you are.', 'Continue', (name) => startGame(roomId, name));
+  }
+
+  function startGame(roomId, name) {
+    document.title = 'Russian Checkers · ' + roomId;
+    let state = null, ws = null, selected = null, path = [];
+    const cursors = { w: null, b: null }; let remoteSel = null, lastSelSig; let lastSentAt = 0, retry = 0;
+
+    const view = h(`<div id="game">
+      <div class="stage">
+        <div class="pbar" id="topBar"></div>
+        <div class="boardwrap"><div class="board" id="board"></div>
+        </div>
+        <div class="pbar" id="botBar"></div>
+        <div class="banner" id="banner"></div>
+      </div>
+      <aside class="side" id="side"></aside>
+    </div>`);
+    app.replaceChildren(view);
+    const boardEl = $('#board'), side = $('#side');
+
+    function connect() {
+      ws = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws');
+      ws.onopen = () => { retry = 0; ws.send(JSON.stringify({ t: 'hello', room: roomId, clientId, name })); };
+      ws.onmessage = (ev) => {
+        const m = JSON.parse(ev.data);
+        if (m.t === 'state') {
+          const prevTurn = state && state.turn, prevLen = state ? state.moves.length : 0;
+          state = m;
+          if (state.moves.length !== prevLen || prevTurn !== state.turn || state.status !== 'playing') remoteSel = null;
+          lastSelSig = undefined; // re-announce the selection so late joiners see it
+          if (!state.moves.length || state.moves.length !== prevLen || prevTurn !== state.turn || state.status !== 'playing') { selected = null; path = []; }
+          render();
+        } else if (m.t === 'select') {
+          remoteSel = m.path && m.path.length ? m.path : null;
+          if (state) renderBoard();
+        } else if (m.t === 'cursor') {
+          cursors[m.color] = m.x == null ? null : { x: m.x, y: m.y };
+          renderCursor();
+        } else if (m.t === 'missing') {
+          app.replaceChildren(h(`<div class="center"><div class="card"><h1>Game not found</h1><p class="muted">This invite link is invalid or the game has expired.</p><a href="/"><button class="primary">Start a new game</button></a></div></div>`));
+        }
+      };
+      ws.onclose = () => {
+        if (!$('#game')) return;
+        cursors.w = cursors.b = null; renderCursor();
+        $('#banner').textContent = 'Connection lost — reconnecting…';
+        setTimeout(connect, Math.min(1000 * 2 ** retry++, 8000));
+      };
+    }
+    const send = (o) => ws && ws.readyState === 1 && ws.send(JSON.stringify(o));
+
+    // orientation: mirrored games show each player their own colour at the bottom (spectators: white);
+    // otherwise everyone shares the host-chosen orientation
+    const flipped = () => state && (state.view.mirror ? state.you.color === 'b' : state.view.bottom === 'b');
+    const toView = (i) => flipped() ? 63 - i : i;
+
+    function myMoves() {
+      if (!state || state.status !== 'playing' || state.you.color !== state.turn) return [];
+      return Rules.legalMoves(state.board, state.you.color);
+    }
+
+    function render() {
+      renderBoard(); renderBars(); renderBanner(); renderSide(); renderCursor();
+      if (state.you.color && state.you.color === state.turn && state.status === 'playing') {
+        const sig = selected == null ? '' : path.join(',');
+        if (sig !== lastSelSig) { lastSelSig = sig; send({ t: 'select', path: sig ? path : null }); }
+      }
+    }
+
+    function renderBoard() {
+      const board = state.board;
+      const playing = state.status === 'playing';
+      const mine = playing && state.you.color === state.turn;
+      // the mover's legal moves are shown to everyone; only the mover gets the interactive hints
+      const moves = playing ? Rules.legalMoves(board, state.turn) : [];
+      const mustCapture = moves.length > 0 && moves[0].captures.length > 0;
+      const capturers = new Set(mustCapture ? moves.map((m) => m.from) : []);
+      const rs = !mine && remoteSel && moves.some((m) => m.from === remoteSel[0] && remoteSel.every((s, k) => m.path[k] === s)) ? remoteSel : null;
+      const sel = mine ? selected : rs ? rs[0] : null;
+      const vpath = mine ? path : rs || [];
+      // preview of a partially entered multi-jump
+      const ghost = new Set();
+      let pieceAt = (i) => board[i];
+      if (sel != null && vpath.length > 1) {
+        for (let k = 1; k < vpath.length; k++) ghost.add(Rules.between(board, vpath[k - 1], vpath[k]));
+        const p = board[sel];
+        const end = vpath[vpath.length - 1];
+        pieceAt = (i) => (i === sel ? '' : i === end ? p : board[i]);
+      }
+      const cands = sel == null ? [] : moves.filter((m) => m.from === sel && vpath.every((s, k) => m.path[k] === s) && m.path.length > vpath.length);
+      const dests = new Map(cands.map((m) => [m.path[vpath.length], m.captures.length > 0]));
+      const last = state.lastMove ? new Set(state.lastMove.path) : new Set();
+      const frag = document.createDocumentFragment();
+      for (let vi = 0; vi < 64; vi++) {
+        const i = toView(vi);
+        const r = vi >> 3, c = vi & 7, dark = (r + c) % 2 === 1;
+        const sq = document.createElement('div');
+        sq.className = 'sq ' + (dark ? 'dark' : 'light');
+        sq.dataset.i = i;
+        if (dark && last.has(i)) sq.classList.add('last');
+        if (vpath.includes(i) && vpath.length > 1) sq.classList.add('path');
+        if (c === 0) sq.insertAdjacentHTML('beforeend', `<span class="coord r">${8 - (i >> 3)}</span>`);
+        if (r === 7) sq.insertAdjacentHTML('beforeend', `<span class="coord f">${'ABCDEFGH'[i & 7]}</span>`);
+        if (dests.has(i)) { sq.classList.add('dest'); if (dests.get(i)) sq.classList.add('cap'); }
+        const p = pieceAt(i);
+        const shown = ghost.has(i) ? board[i] : p;
+        if (shown) {
+          const col = Rules.colorOf(shown);
+          const el = document.createElement('div');
+          el.className = 'piece ' + col + (Rules.isKing(shown) ? ' king' : '');
+          if (ghost.has(i)) el.classList.add('ghost');
+          if (col === state.you.color) {
+            el.classList.add('mine');
+            if (mine && !ghost.has(i) && moves.some((m) => m.from === i)) el.classList.add('movable');
+          }
+          // pieces that must capture pulse for everyone while the mover has not picked one yet
+          if (capturers.has(i) && sel == null && !ghost.has(i)) el.classList.add('must');
+          if (p && sel != null && i === (vpath.length > 1 ? vpath[vpath.length - 1] : sel)) el.classList.add('sel');
+          sq.append(el);
+        }
+        frag.append(sq);
+      }
+      boardEl.replaceChildren(frag);
+    }
+
+    function counts() {
+      const c = { w: 0, b: 0 };
+      for (const p of state.board) if (p) c[Rules.colorOf(p)]++;
+      return c;
+    }
+
+    function bar(color) {
+      const p = state.players[color];
+      const turn = state.status === 'playing' && state.turn === color;
+      const you = state.you.color === color;
+      const n = counts()[color];
+      const name = p ? esc(p.name) : '<span class="muted">Waiting for opponent…</span>';
+      return `<span class="dot ${color}"></span><span class="nm">${name}${you ? ' (you)' : ''}</span>
+        ${turn ? '<span class="tag turn">to move</span>' : ''}
+        ${p && !p.online ? '<span class="tag off">offline</span>' : ''}
+        <span class="cnt">${n} piece${n === 1 ? '' : 's'}</span>`;
+    }
+    function renderBars() {
+      const bottom = flipped() ? 'b' : 'w';
+      $('#botBar').innerHTML = bar(bottom);
+      $('#topBar').innerHTML = bar(Rules.other(bottom));
+    }
+
+    function renderBanner() {
+      const el = $('#banner');
+      el.className = 'banner';
+      const s = state, me = s.you.color;
+      const nm = (c) => (s.players[c] ? esc(s.players[c].name) : 'Opponent');
+      if (s.status === 'waiting') {
+        el.textContent = s.you.host ? 'Share the invite link and pick an opponent when someone joins.'
+          : s.you.waiting ? 'Waiting for the host to pick an opponent…' : 'Waiting for an opponent to be chosen.';
+      } else if (s.status === 'over') {
+        el.classList.add('over');
+        const r = s.result;
+        if (!r.winner) el.textContent = 'Game drawn by agreement.';
+        else {
+          const why = r.reason === 'resign' ? ` (${nm(Rules.other(r.winner))} resigned)` : '';
+          el.innerHTML = `🏆 ${nm(r.winner)} wins${why}`;
+          if (me) el.innerHTML = (me === r.winner ? '🏆 You win!' : 'You lost.') + why;
+        }
+      } else if (me && s.turn === me) {
+        const mv = myMoves();
+        if (mv.length && mv[0].captures.length) {
+          el.classList.add('must');
+          el.textContent = selected == null ? '⚔ Capture is mandatory — pick a highlighted piece.'
+            : '⚔ Capture is mandatory — continue the jump.';
+        } else el.textContent = 'Your move.';
+      } else if (me) el.textContent = `${nm(s.turn)} is thinking…`;
+      else el.textContent = `${nm(s.turn)} to move (${s.turn === 'w' ? 'white' : 'black'}).`;
+    }
+
+    function renderSide() {
+      const s = state, me = s.you.color;
+      const link = location.origin + '/g/' + s.room;
+      let html = `<div class="card"><h2>Invite link</h2>
+        <div class="invite"><input type="text" readonly value="${esc(link)}" id="linkIn"><button id="copyBtn">Copy</button></div>
+        <div class="muted" style="margin-top:8px;font-size:13px">Friends who open it join as opponent or spectators.</div></div>`;
+
+      if (s.you.host && s.status === 'waiting') {
+        const l = s.lobby || [];
+        html += `<div class="card"><h2>Players asking to join</h2>` + (l.length
+          ? `<ul class="list">${l.map((p) => `<li><span>${esc(p.name)}</span><button class="primary" data-accept="${esc(p.id)}">Play</button></li>`).join('')}</ul>
+             <div class="muted" style="margin-top:8px;font-size:13px">Everyone else will watch as spectators.</div>`
+          : `<div class="muted">Nobody yet. Send the link above.</div>`) + `</div>`;
+      }
+      if (!me && !s.you.waiting && s.status === 'waiting' && !s.you.host) {
+        html += `<div class="card"><h2>Seat open</h2><div class="muted">You are spectating. Want to play?</div>
+          <button class="primary" id="wantBtn" style="margin-top:10px">Ask to play</button></div>`;
+      }
+
+      // offers
+      if (s.offer && me) {
+        const mine = s.offer.from === me;
+        const label = s.offer.kind === 'draw' ? 'a draw' : 'a rematch';
+        html += `<div class="card offer"><h2>${mine ? `You offered ${label}` : `Opponent offers ${label}`}</h2>` +
+          (mine ? '<div class="muted">Waiting for a reply…</div>'
+            : `<div class="row"><button class="primary" data-resp="1">Accept</button><button data-resp="0">Decline</button></div>`) + `</div>`;
+      }
+
+      if (me) {
+        const acts = [];
+        if (s.status === 'playing') acts.push('<button id="drawBtn"' + (s.offer ? ' disabled' : '') + '>Offer draw</button>', '<button class="danger" id="resignBtn">Resign</button>');
+        if (s.status === 'over' && s.players.w && s.players.b) acts.push('<button class="primary" id="rematchBtn"' + (s.offer ? ' disabled' : '') + '>Rematch</button>');
+        const opp = s.players[Rules.other(me)];
+        if (s.you.host && opp && !opp.online && s.status !== 'waiting') acts.push('<button id="releaseBtn">Free opponent seat</button>');
+        if (s.you.host && opp && s.status === 'over') acts.push('<button id="releaseBtn">Pick another opponent</button>');
+        if (acts.length) html += `<div class="card"><h2>Game</h2><div class="row">${acts.join('')}</div></div>`;
+      }
+
+      // moves
+      const rows = [];
+      for (let i = 0; i < s.moves.length; i += 2) {
+        const a = s.moves[i], b = s.moves[i + 1];
+        const f = (m) => m ? `<span class="${m.capture ? 'cap' : ''}">${esc(m.text)}</span>` : '<span></span>';
+        rows.push(`<span class="n">${i / 2 + 1}.</span>${f(a)}${f(b)}`);
+      }
+      html += `<div class="card"><h2>Moves</h2><div class="moves" id="movesList">${rows.join('') || '<span class="muted" style="grid-column:1/-1">No moves yet.</span>'}</div></div>`;
+
+      if (s.spectators.length) html += `<div class="card names"><h2>Spectators (${s.spectators.length})</h2><div class="muted">${s.spectators.map(esc).join(', ')}</div></div>`;
+      if (!s.you.host && s.you.color == null && s.lobbyCount) { /* spectator-facing lobby info is not needed */ }
+
+      // keep the invite input selection/scroll stable by replacing only when changed
+      if (side.dataset.sig !== html) {
+        side.innerHTML = html; side.dataset.sig = html;
+        const ml = $('#movesList'); if (ml) ml.scrollTop = ml.scrollHeight;
+      }
+    }
+
+    side.addEventListener('click', async (e) => {
+      const b = e.target.closest('button'); if (!b) return;
+      if (b.id === 'copyBtn') {
+        const v = $('#linkIn').value;
+        try { await navigator.clipboard.writeText(v); } catch { $('#linkIn').select(); document.execCommand('copy'); }
+        b.textContent = 'Copied ✓'; setTimeout(() => (b.textContent = 'Copy'), 1500);
+      } else if (b.dataset.accept) send({ t: 'accept', id: b.dataset.accept });
+      else if (b.dataset.resp) send({ t: 'respond', accept: b.dataset.resp === '1' });
+      else if (b.id === 'drawBtn') send({ t: 'offer', kind: 'draw' });
+      else if (b.id === 'rematchBtn') send({ t: 'offer', kind: 'rematch' });
+      else if (b.id === 'resignBtn') { if (confirm('Resign this game?')) send({ t: 'resign' }); }
+      else if (b.id === 'releaseBtn') send({ t: 'release' });
+      else if (b.id === 'wantBtn') send({ t: 'wantplay' });
+    });
+
+    // ---- move input (click / tap) ----
+    boardEl.addEventListener('click', (e) => {
+      const sqEl = e.target.closest('.sq'); if (!sqEl || !state) return;
+      const i = +sqEl.dataset.i;
+      const moves = myMoves();
+      if (!moves.length) return;
+      if (selected != null) {
+        const cands = moves.filter((m) => m.from === selected && path.every((s, k) => m.path[k] === s) && m.path.length > path.length);
+        if (cands.some((m) => m.path[path.length] === i)) {
+          const np = path.concat(i);
+          const full = cands.find((m) => m.path.length === np.length && m.path.every((s, k) => s === np[k]));
+          if (full) { send({ t: 'move', path: np }); selected = null; path = []; }
+          else path = np;
+          return render();
+        }
+      }
+      if (path.length <= 1 && moves.some((m) => m.from === i)) {
+        if (selected === i) { selected = null; path = []; } else { selected = i; path = [i]; }
+      } else if (path.length <= 1) { selected = null; path = []; }
+      render();
+    });
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && selected != null) { selected = null; path = []; if (state) render(); }
+    });
+
+    // ---- cursor sharing (players only) ----
+    function boardPoint(e) {
+      const r = boardEl.getBoundingClientRect();
+      let x = (e.clientX - r.left) / r.width, y = (e.clientY - r.top) / r.height;
+      if (flipped()) { x = 1 - x; y = 1 - y; } // send in canonical (white-at-bottom) coordinates
+      return { x, y };
+    }
+    const wrap = $('.boardwrap');
+    wrap.addEventListener('pointermove', (e) => {
+      if (!state || !state.you.color || e.pointerType === 'touch') return;
+      const now = performance.now();
+      if (now - lastSentAt < 40) return;
+      lastSentAt = now;
+      const p = boardPoint(e);
+      send({ t: 'cursor', x: +p.x.toFixed(4), y: +p.y.toFixed(4) });
+    });
+    wrap.addEventListener('pointerleave', () => { if (state && state.you.color) send({ t: 'cursor', x: null, y: null }); });
+
+    const cursorEls = {};
+    function renderCursor() {
+      for (const color of ['w', 'b']) {
+        let el = cursorEls[color];
+        if (!el) {
+          el = cursorEls[color] = h(`<div class="cursor hidden"><svg width="18" height="18" viewBox="0 0 18 18"><path d="M2 1l13 7-6 1.6L6.6 16z" fill="${color === 'w' ? '#e0589b' : '#2f8fe0'}" stroke="#fff" stroke-width="1.5" stroke-linejoin="round"/></svg><span style="background:${color === 'w' ? '#e0589b' : '#2f8fe0'}"></span></div>`);
+          wrap.append(el);
+        }
+        const cur = cursors[color];
+        // players only see the opponent's pointer; spectators see both
+        const visible = state && cur && color !== state.you.color;
+        if (!visible) { el.classList.add('hidden'); continue; }
+        const p = state.players[color];
+        let { x, y } = cur;
+        if (flipped()) { x = 1 - x; y = 1 - y; }
+        const r = boardEl.getBoundingClientRect(), w = wrap.getBoundingClientRect();
+        el.classList.remove('hidden');
+        el.style.transform = `translate(${r.left - w.left + x * r.width}px, ${r.top - w.top + y * r.height}px)`;
+        $('span', el).textContent = p ? p.name : (color === 'w' ? 'White' : 'Black');
+      }
+    }
+    new ResizeObserver(() => renderCursor()).observe(wrap);
+
+    connect();
+  }
+})();
+</script>
+</body>
+</html>
