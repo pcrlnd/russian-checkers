@@ -150,6 +150,9 @@ h2 { font-size: 15px; margin: 0 0 8px; }
 .banner.over { border-color: var(--accent); }
 .banner.win { animation: bannerWin 1.2s ease-out; border-color: #d8a31a; background: color-mix(in srgb, #d8a31a 18%, var(--panel)); font-size: 17px; font-weight: 700; }
 @keyframes bannerWin { 0% { transform: scale(.85); opacity: 0; } 40% { transform: scale(1.08); opacity: 1; } 60% { transform: scale(.98); } 100% { transform: scale(1); } }
+.toast { position: fixed; left: 50%; bottom: 20px; transform: translate(-50%, 20px); opacity: 0; transition: .25s; z-index: 120;
+  background: var(--text); color: var(--bg); padding: 10px 14px; border-radius: 10px; max-width: calc(100vw - 32px); font-size: 14px; pointer-events: none; }
+.toast.show { opacity: .95; transform: translate(-50%, 0); }
 .confetti { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 100; }
 .piece.winner { animation: winPulse 1s ease-in-out 3; }
 @keyframes winPulse { 50% { transform: scale(1.18); } }
@@ -227,7 +230,7 @@ h2 { font-size: 15px; margin: 0 0 8px; }
     soundBtn.setAttribute('aria-pressed', muted ? 'true' : 'false');
   };
   syncSoundBtn();
-  soundBtn.onclick = () => { muted = !muted; store.set('muted', muted ? '1' : '0'); syncSoundBtn(); if (!muted) { ctx(); sfx.move(); } };
+  soundBtn.onclick = () => { muted = !muted; store.set('muted', muted ? '1' : '0'); syncSoundBtn(); if (!muted) { const a = ctx(); const r = a && a.resume && a.resume(); Promise.resolve(r).then(() => sfx.move(), () => sfx.move()); } };
   function ctx() {
     try {
       if (!actx) actx = new (window.AudioContext || window.webkitAudioContext)();
@@ -266,12 +269,29 @@ h2 { font-size: 15px; margin: 0 0 8px; }
     src.connect(f).connect(g).connect(a.destination);
     src.start(a.currentTime + t0);
   }
+  let toastTimer = null;
+  function toast(msg) {
+    let t = $('#toast');
+    if (!t) { t = h('<div id="toast" class="toast"></div>'); document.body.append(t); }
+    t.textContent = msg; t.classList.add('show');
+    clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), 5000);
+  }
+  // run `fn` only when audio is really running; otherwise tell the player why it is silent
+  function play(fn) {
+    if (muted) return;
+    try {
+      const a = ctx();
+      if (!a) return toast('Sound is not supported in this browser.');
+      if (a.state !== 'running') return toast('Sound is blocked by the browser. Click anywhere on the page to enable it.');
+      fn();
+    } catch (err) { console.error('sound failed', err); toast('Sound error: ' + err.message); }
+  }
   const sfx = {
-    move() { if (!muted) click(0); },
-    capture() { if (!muted) { click(0, .38); click(.09, .3); } },
-    win() { if (!muted) [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => tone(f, i * .11, .35, { type: 'triangle', gain: .22 })); },
-    lose() { if (!muted) { tone(392, 0, .3, { type: 'triangle', gain: .2 }); tone(311.13, .22, .45, { type: 'triangle', gain: .2 }); } },
-    draw() { if (!muted) { tone(440, 0, .25, { type: 'triangle', gain: .18 }); tone(440, .25, .25, { type: 'triangle', gain: .18 }); } },
+    move() { play(() => click(0)); },
+    capture() { play(() => { click(0, .38); click(.09, .3); }); },
+    win() { play(() => [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => tone(f, i * .11, .35, { type: 'triangle', gain: .22 }))); },
+    lose() { play(() => { tone(392, 0, .3, { type: 'triangle', gain: .2 }); tone(311.13, .22, .45, { type: 'triangle', gain: .2 }); }); },
+    draw() { play(() => { tone(440, 0, .25, { type: 'triangle', gain: .18 }); tone(440, .25, .25, { type: 'triangle', gain: .18 }); }); },
   };
 
   // ---- victory confetti ----
