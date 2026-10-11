@@ -231,7 +231,7 @@ h2 { font-size: 15px; margin: 0 0 8px; }
   function ctx() {
     try {
       if (!actx) actx = new (window.AudioContext || window.webkitAudioContext)();
-      if (actx.state !== 'running') actx.resume().catch(() => {});
+      if (actx.state !== 'running') { const r = actx.resume(); if (r && r.catch) r.catch(() => {}); }
     } catch { actx = null; }
     return actx;
   }
