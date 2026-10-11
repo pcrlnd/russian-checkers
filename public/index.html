@@ -231,13 +231,18 @@ h2 { font-size: 15px; margin: 0 0 8px; }
   function ctx() {
     try {
       if (!actx) actx = new (window.AudioContext || window.webkitAudioContext)();
-      if (actx.state === 'suspended') actx.resume();
+      if (actx.state !== 'running') actx.resume().catch(() => {});
     } catch { actx = null; }
     return actx;
   }
-  // browsers only allow audio after a user gesture
-  addEventListener('pointerdown', () => ctx(), { once: true });
-  addEventListener('keydown', () => ctx(), { once: true });
+  // Browsers only start audio from a user gesture, and the qualifying events differ
+  // (touch needs touchend/pointerup). Keep trying on every gesture until it is running.
+  const unlockEvents = ['pointerdown', 'pointerup', 'touchend', 'click', 'keydown'];
+  function unlock() {
+    const a = ctx();
+    if (a && a.state === 'running') unlockEvents.forEach((e) => removeEventListener(e, unlock, true));
+  }
+  unlockEvents.forEach((e) => addEventListener(e, unlock, true));
   function tone(freq, t0, dur, { type = 'sine', gain = .25, to = null } = {}) {
     const a = ctx(); if (!a) return;
     const o = a.createOscillator(), g = a.createGain();
