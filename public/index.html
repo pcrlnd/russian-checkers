@@ -288,7 +288,7 @@ h2 { font-size: 15px; margin: 0 0 8px; }
   }
   const sfx = {
     move() { play(() => click(0)); },
-    capture() { play(() => { click(0, .38); click(.09, .3); }); },
+    capture() { play(() => { click(0, .4); tone(90, 0, .16, { gain: .35, to: 50 }); }); }, // one deeper thud, not two tocks
     win() { play(() => [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => tone(f, i * .11, .35, { type: 'triangle', gain: .22 }))); },
     lose() { play(() => { tone(392, 0, .3, { type: 'triangle', gain: .2 }); tone(311.13, .22, .45, { type: 'triangle', gain: .2 }); }); },
     draw() { play(() => { tone(440, 0, .25, { type: 'triangle', gain: .18 }); tone(440, .25, .25, { type: 'triangle', gain: .18 }); }); },
@@ -430,10 +430,12 @@ h2 { font-size: 15px; margin: 0 0 8px; }
           state = m;
           if (state.status !== 'over') celebrate = null;
           if (hadState) {
-            if (state.moves.length > prevLen) {
+            const ended = prevStatus !== 'over' && state.status === 'over';
+            // the final move gets the result jingle instead of a move sound, so they never stack
+            if (state.moves.length > prevLen && !(ended && state.result.reason === 'no-moves')) {
               (state.moves[state.moves.length - 1].capture ? sfx.capture : sfx.move)();
             }
-            if (prevStatus !== 'over' && state.status === 'over') {
+            if (ended) {
               const w = state.result.winner, me = state.you.color;
               if (!w) sfx.draw();
               else if (me && me !== w) sfx.lose();
