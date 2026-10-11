@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Russian Checkers</title>
+<title>Russian Checkers by pcroland</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='16' r='14' fill='%23c0392b'/><circle cx='16' cy='16' r='8' fill='none' stroke='%23fff' stroke-opacity='.6' stroke-width='2'/></svg>">
 <style>
 :root {
@@ -52,6 +52,11 @@ header {
 }
 .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; letter-spacing: .2px; }
 .brand i { width: 22px; height: 22px; border-radius: 50%; background: var(--piece-b); box-shadow: inset 0 0 0 4px var(--piece-b), inset 0 0 0 6px var(--piece-w); }
+.brand a { color: var(--accent); text-decoration: none; }
+.brand a:hover { text-decoration: underline; }
+.hactions { display: flex; align-items: center; gap: 8px; }
+a.icon-btn { border: 1px solid var(--line); background: var(--panel); border-radius: 10px; color: var(--text); text-decoration: none; }
+a.icon-btn:hover { background: color-mix(in srgb, var(--panel) 88%, var(--text)); }
 .icon-btn { width: 38px; height: 38px; padding: 0; display: grid; place-items: center; font-size: 18px; }
 
 .card {
@@ -141,6 +146,11 @@ h2 { font-size: 15px; margin: 0 0 8px; }
 }
 .banner.must { border-color: var(--hl); background: color-mix(in srgb, var(--hl) 14%, var(--panel)); }
 .banner.over { border-color: var(--accent); }
+.banner.win { animation: bannerWin 1.2s ease-out; border-color: #d8a31a; background: color-mix(in srgb, #d8a31a 18%, var(--panel)); font-size: 17px; font-weight: 700; }
+@keyframes bannerWin { 0% { transform: scale(.85); opacity: 0; } 40% { transform: scale(1.08); opacity: 1; } 60% { transform: scale(.98); } 100% { transform: scale(1); } }
+.confetti { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 100; }
+.piece.winner { animation: winPulse 1s ease-in-out 3; }
+@keyframes winPulse { 50% { transform: scale(1.18); } }
 
 .side { display: flex; flex-direction: column; gap: 14px; }
 .side .card { padding: 16px; }
@@ -167,8 +177,14 @@ h2 { font-size: 15px; margin: 0 0 8px; }
 </head>
 <body>
 <header>
-  <div class="brand"><i></i><span>Russian Checkers</span></div>
-  <button class="icon-btn" id="themeBtn" title="Toggle light / dark" aria-label="Toggle theme">◐</button>
+  <div class="brand"><i></i><span>Russian Checkers by <a href="https://github.com/pcrlnd" target="_blank" rel="noopener">pcroland</a></span></div>
+  <div class="hactions">
+    <button class="icon-btn" id="soundBtn" title="Sound on/off" aria-label="Toggle sound">🔊</button>
+    <button class="icon-btn" id="themeBtn" title="Toggle light / dark" aria-label="Toggle theme">◐</button>
+    <a class="icon-btn gh" href="https://github.com/pcrlnd/russian-checkers" target="_blank" rel="noopener" title="View on GitHub" aria-label="GitHub repository">
+      <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.6 7.6 0 0 1 4 0c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>
+    </a>
+  </div>
 </header>
 <main id="app"></main>
 
@@ -188,6 +204,88 @@ h2 { font-size: 15px; margin: 0 0 8px; }
   function applyTheme(t) { root.dataset.theme = t; store.set('theme', t); }
   applyTheme(store.get('theme') || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'));
   $('#themeBtn').onclick = () => applyTheme(root.dataset.theme === 'dark' ? 'light' : 'dark');
+
+  // ---- sound (synthesised with WebAudio, no assets) ----
+  let muted = store.get('muted') === '1';
+  let actx = null;
+  const soundBtn = $('#soundBtn');
+  const syncSoundBtn = () => { soundBtn.textContent = muted ? '🔇' : '🔊'; };
+  syncSoundBtn();
+  soundBtn.onclick = () => { muted = !muted; store.set('muted', muted ? '1' : '0'); syncSoundBtn(); if (!muted) { ctx(); sfx.move(); } };
+  function ctx() {
+    try {
+      if (!actx) actx = new (window.AudioContext || window.webkitAudioContext)();
+      if (actx.state === 'suspended') actx.resume();
+    } catch { actx = null; }
+    return actx;
+  }
+  // browsers only allow audio after a user gesture
+  addEventListener('pointerdown', () => ctx(), { once: true });
+  addEventListener('keydown', () => ctx(), { once: true });
+  function tone(freq, t0, dur, { type = 'sine', gain = .25, to = null } = {}) {
+    const a = ctx(); if (!a) return;
+    const o = a.createOscillator(), g = a.createGain();
+    o.type = type;
+    o.frequency.setValueAtTime(freq, a.currentTime + t0);
+    if (to) o.frequency.exponentialRampToValueAtTime(to, a.currentTime + t0 + dur);
+    g.gain.setValueAtTime(0.0001, a.currentTime + t0);
+    g.gain.exponentialRampToValueAtTime(gain, a.currentTime + t0 + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001, a.currentTime + t0 + dur);
+    o.connect(g).connect(a.destination);
+    o.start(a.currentTime + t0); o.stop(a.currentTime + t0 + dur + 0.05);
+  }
+  function click(t0, gain = .3) {
+    const a = ctx(); if (!a) return;
+    tone(220, t0, .09, { gain, to: 110 }); // body of the "tock"
+    const len = Math.floor(a.sampleRate * .03), buf = a.createBuffer(1, len, a.sampleRate), d = buf.getChannelData(0);
+    for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / len);
+    const src = a.createBufferSource(), g = a.createGain(), f = a.createBiquadFilter();
+    f.type = 'highpass'; f.frequency.value = 1200;
+    g.gain.value = gain * .6; src.buffer = buf;
+    src.connect(f).connect(g).connect(a.destination);
+    src.start(a.currentTime + t0);
+  }
+  const sfx = {
+    move() { if (!muted) click(0); },
+    capture() { if (!muted) { click(0, .38); click(.09, .3); } },
+    win() { if (!muted) [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => tone(f, i * .11, .35, { type: 'triangle', gain: .22 })); },
+    lose() { if (!muted) { tone(392, 0, .3, { type: 'triangle', gain: .2 }); tone(311.13, .22, .45, { type: 'triangle', gain: .2 }); } },
+    draw() { if (!muted) { tone(440, 0, .25, { type: 'triangle', gain: .18 }); tone(440, .25, .25, { type: 'triangle', gain: .18 }); } },
+  };
+
+  // ---- victory confetti ----
+  function confetti() {
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const cv = document.createElement('canvas');
+    cv.className = 'confetti';
+    document.body.append(cv);
+    const dpr = window.devicePixelRatio || 1;
+    const W = cv.width = innerWidth * dpr, H = cv.height = innerHeight * dpr;
+    const g = cv.getContext('2d');
+    const colors = ['#e0589b', '#2f8fe0', '#d8a31a', '#2e9e5b', '#f2f2f2', '#e8590c'];
+    const ps = Array.from({ length: 160 }, (_, i) => {
+      const left = i % 2 === 0;
+      const ang = -Math.PI / 2 + (Math.random() - .5) * 1.2;
+      const sp = (12 + Math.random() * 14) * dpr;
+      return {
+        x: (left ? .1 : .9) * W, y: H * .95, vx: Math.cos(ang) * sp + (left ? 3 : -3) * dpr, vy: Math.sin(ang) * sp,
+        w: (6 + Math.random() * 6) * dpr, h: (4 + Math.random() * 5) * dpr, r: Math.random() * 6, vr: (Math.random() - .5) * .4,
+        c: colors[(Math.random() * colors.length) | 0],
+      };
+    });
+    const t0 = performance.now();
+    (function frame(now) {
+      const t = now - t0;
+      g.clearRect(0, 0, W, H);
+      for (const p of ps) {
+        p.vy += .45 * dpr; p.vx *= .992; p.x += p.vx; p.y += p.vy; p.r += p.vr;
+        g.save(); g.translate(p.x, p.y); g.rotate(p.r);
+        g.globalAlpha = Math.max(0, Math.min(1, (4500 - t) / 900));
+        g.fillStyle = p.c; g.fillRect(-p.w / 2, -p.h / 2, p.w, p.h); g.restore();
+      }
+      if (t < 4500) requestAnimationFrame(frame); else cv.remove();
+    })(t0);
+  }
 
   // ---- identity ----
   let clientId = store.get('clientId');
@@ -263,9 +361,9 @@ h2 { font-size: 15px; margin: 0 0 8px; }
   }
 
   function startGame(roomId, name) {
-    document.title = 'Russian Checkers · ' + roomId;
+    document.title = 'Russian Checkers by pcroland · ' + roomId;
     let state = null, ws = null, selected = null, path = [];
-    const cursors = { w: null, b: null }; let remoteSel = null, lastSelSig; let lastSentAt = 0, retry = 0;
+    const cursors = { w: null, b: null }; let remoteSel = null, lastSelSig, celebrate = null; let lastSentAt = 0, retry = 0;
 
     const view = h(`<div id="game">
       <div class="stage">
@@ -286,8 +384,21 @@ h2 { font-size: 15px; margin: 0 0 8px; }
       ws.onmessage = (ev) => {
         const m = JSON.parse(ev.data);
         if (m.t === 'state') {
-          const prevTurn = state && state.turn, prevLen = state ? state.moves.length : 0;
+          const hadState = !!state;
+          const prevTurn = state && state.turn, prevLen = state ? state.moves.length : 0, prevStatus = state && state.status;
           state = m;
+          if (state.status !== 'over') celebrate = null;
+          if (hadState) {
+            if (state.moves.length > prevLen) {
+              (state.moves[state.moves.length - 1].capture ? sfx.capture : sfx.move)();
+            }
+            if (prevStatus !== 'over' && state.status === 'over') {
+              const w = state.result.winner, me = state.you.color;
+              if (!w) sfx.draw();
+              else if (me && me !== w) sfx.lose();
+              else { sfx.win(); confetti(); celebrate = w; }
+            }
+          }
           if (state.moves.length !== prevLen || prevTurn !== state.turn || state.status !== 'playing') remoteSel = null;
           lastSelSig = undefined; // re-announce the selection so late joiners see it
           if (!state.moves.length || state.moves.length !== prevLen || prevTurn !== state.turn || state.status !== 'playing') { selected = null; path = []; }
@@ -371,6 +482,7 @@ h2 { font-size: 15px; margin: 0 0 8px; }
           const el = document.createElement('div');
           el.className = 'piece ' + col + (Rules.isKing(shown) ? ' king' : '');
           if (ghost.has(i)) el.classList.add('ghost');
+          if (celebrate && col === celebrate) el.classList.add('winner');
           if (col === state.you.color) {
             el.classList.add('mine');
             if (mine && !ghost.has(i) && moves.some((m) => m.from === i)) el.classList.add('movable');
@@ -419,6 +531,7 @@ h2 { font-size: 15px; margin: 0 0 8px; }
       } else if (s.status === 'over') {
         el.classList.add('over');
         const r = s.result;
+        if (r.winner && (!me || me === r.winner)) el.classList.add('win');
         if (!r.winner) el.textContent = 'Game drawn by agreement.';
         else {
           const why = r.reason === 'resign' ? ` (${nm(Rules.other(r.winner))} resigned)` : '';

@@ -28,6 +28,7 @@ Create a game, share a link, play a friend — while others watch.
 | ⚔️ **Capture guidance** | Mandatory captures are enforced and highlighted for every viewer. |
 | 🔄 **Board orientation** | Flip the board per player, or use one shared view with your side top or bottom. |
 | 🌗 **Light / dark theme** | Follows your system setting, with a manual toggle. |
+| 🔊 **Sound & celebrations** | Synthesised move, capture and result sounds (with a mute button), plus confetti for the winner. |
 | 📱 **Responsive** | Works on desktop, tablet and phone; tap or click to move. |
 | 🤝 **Game flow** | Draw offers, resign, rematch with swapped colours, move list, auto-reconnect. |
 
